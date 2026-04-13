@@ -24,11 +24,14 @@ app.use(express.json());
 // Enable CORS
 app.use(
   cors({
-    origin: "http://localhost:8080",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: "https://slotlyy.netlify.app/",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );
+
+app.options("*", cors());
+
 
 // Routes
 app.use("/api/users", userRoutes);
