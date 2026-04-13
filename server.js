@@ -24,7 +24,7 @@ app.use(express.json());
 // Enable CORS
 app.use(
   cors({
-    origin: "https://slotlyy.netlify.app/",
+    origin: "https://slotlyy.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
