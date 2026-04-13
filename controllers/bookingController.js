@@ -1,5 +1,6 @@
 import Booking from "../models/Booking.js";
 import Business from "../models/Business.js";
+import Customer from "../models/Customer.js";
 import Availability from "../models/Availability.js";  
 import { generateSlots } from "./availabilityController.js";
 
@@ -28,9 +29,8 @@ export const createBooking = async (req, res) => {
     }
 
     const customer = await Customer.findById(customer_id);
-    if (!customer) {
-      return res.status(400).json({ message: "Invalid customer" });
-    }
+    if (!customer) return res.status(400).json({ message: "Invalid customer" });
+
 
     // Get availability for that day
     const dayOfWeek = new Date(booking_date).toLocaleString("en-US", { weekday: "long" });
@@ -90,7 +90,6 @@ export const createBooking = async (req, res) => {
       business_id,
       service_id, // still store the name
       customer_id,
-      customer_phone,
       booking_date,
       booking_time,
       notes,
@@ -105,7 +104,7 @@ export const createBooking = async (req, res) => {
 // Get all bookings for a business
 export const getBookingsByBusiness = async (req, res) => {
   try {
-    const bookings = await Booking.find({ business_id: req.params.businessId });
+    const bookings = await Booking.find({ business_id: req.params.businessId }).populate("customer_id", "name phone");
     res.json(bookings);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
