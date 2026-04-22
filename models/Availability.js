@@ -8,6 +8,11 @@ const availabilitySchema = new mongoose.Schema(
       ref: "Business", // link to the business
       required: true,
     },
+    employee_id: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "Employee", 
+      required: true 
+    },
     day_of_week: {
       type: String,
       enum: [

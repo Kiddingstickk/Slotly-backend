@@ -11,6 +11,7 @@ import availabilityRoutes from "./routes/availabilityRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import testRoutes from "./routes/testRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
+import employeeRoutes from "./routes/employeeRoutes.js";
 // Load env vars BEFORE importing cloudinary
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use("/api/availability", availabilityRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/customers", customerRoutes);
+app.use("/api/employees", employeeRoutes);
 
 // Connect Database
 connectDB();

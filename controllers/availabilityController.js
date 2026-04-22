@@ -2,6 +2,7 @@
 import Availability from "../models/Availability.js";
 import Business from "../models/Business.js";
 import Booking from "../models/Booking.js";
+import Employee from "../models/Employee.js";
 import { startOfDay, endOfDay } from "date-fns";
 
 
@@ -33,7 +34,7 @@ export function generateSlots(startTime, endTime, slotDuration) {
 // Create availability for a business
 export const createAvailability = async (req, res) => {
   try {
-    const { business_id, day_of_week, start_time, end_time, slot_duration } = req.body;
+    const { business_id, employee_id, day_of_week, start_time, end_time, slot_duration } = req.body;
 
     // Validate business
     const business = await Business.findById(business_id);
@@ -41,8 +42,14 @@ export const createAvailability = async (req, res) => {
       return res.status(400).json({ message: "Invalid business" });
     }
 
+    const employee = await Employee.findById(employee_id);
+    if (!employee || employee.business_id.toString() !== business_id) {
+      return res.status(400).json({ message: "Invalid employee for this business" });
+    }
+
     const availability = await Availability.create({
       business_id,
+      employee_id,
       day_of_week,
       start_time,
       end_time,
@@ -59,8 +66,12 @@ export const createAvailability = async (req, res) => {
 export const getAvailabilityByBusiness = async (req, res) => {
   try {
     const { businessId } = req.params;
+    const { employeeId } = req.query;
 
-    const availability = await Availability.find({ business_id: businessId });
+    const filter = { business_id: businessId };
+    if (employeeId) filter.employee_id = employeeId;
+
+    const availability = await Availability.find(filter);
     res.json(availability);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -83,14 +94,15 @@ export const getAvailabilityById = async (req, res) => {
 };
 
 
-
+// Get slots for a specific employee
 export const getAvailabilitySlots = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const { day, date } = req.query; // day = "Monday", date = "2026-03-09"
+    const { employeeId, day, date } = req.query;
 
     const availability = await Availability.findOne({
       business_id: businessId,
+      employee_id: employeeId,
       day_of_week: day,
     });
 
@@ -98,17 +110,18 @@ export const getAvailabilitySlots = async (req, res) => {
       return res.json({ slots: [] });
     }
 
-    // Generate all slots
+    // Generate slots
     const slots = generateSlots(
       availability.start_time,
       availability.end_time,
       availability.slot_duration
     );
 
-    // If booking_date is a Date in your model:
-    const selectedDate = new Date(date); // frontend must pass ?date=YYYY-MM-DD
+    // Check bookings for that employee
+    const selectedDate = new Date(date);
     const booked = await Booking.find({
       business_id: businessId,
+      employee_id: employeeId,
       booking_date: {
         $gte: startOfDay(selectedDate),
         $lte: endOfDay(selectedDate),
@@ -117,7 +130,6 @@ export const getAvailabilitySlots = async (req, res) => {
 
     const bookedTimes = booked.map(b => b.booking_time);
 
-    // Return slots with booked flag
     const result = slots.map(s => ({
       time: s,
       booked: bookedTimes.includes(s),
@@ -128,6 +140,7 @@ export const getAvailabilitySlots = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 
 export const createWeeklyAvailability = async (req, res) => {

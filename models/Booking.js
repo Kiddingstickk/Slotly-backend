@@ -8,6 +8,11 @@ const bookingSchema = new mongoose.Schema(
       ref: "Business", 
       required: true,
     },
+    employee_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Employee",
+      required: true,
+    },
     service_id: {
       type: String, 
       required: true,

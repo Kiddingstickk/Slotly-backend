@@ -2,6 +2,7 @@ import Booking from "../models/Booking.js";
 import Business from "../models/Business.js";
 import Customer from "../models/Customer.js";
 import Availability from "../models/Availability.js";  
+import Employee from "../models/Employee.js";
 import { generateSlots } from "./availabilityController.js";
 
 
@@ -9,6 +10,7 @@ export const createBooking = async (req, res) => {
   try {
     const {
       business_id,
+      employee_id,
       service_id, // actually service name
       customer_id,
       booking_date,
@@ -22,10 +24,20 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ message: "Invalid business" });
     }
 
+    const employee = await Employee.findById(employee_id);
+    if (!employee || employee.business_id.toString() !== business_id) {
+      return res.status(400).json({ message: "Invalid employee for this business" });
+    }
+
     // Validate service by name
     const service = business.services.find(s => s.name === service_id);
     if (!service) {
       return res.status(400).json({ message: "Invalid service" });
+    }
+
+    // Validate employee can perform this service
+    if (!employee.services.includes(service_id)) {
+      return res.status(400).json({ message: "Employee not authorized for this service" });
     }
 
     const customer = await Customer.findById(customer_id);
@@ -36,6 +48,7 @@ export const createBooking = async (req, res) => {
     const dayOfWeek = new Date(booking_date).toLocaleString("en-US", { weekday: "long" });
     const availability = await Availability.findOne({
       business_id,
+      employee_id,
       day_of_week: dayOfWeek,
     });
     if (!availability) {
@@ -78,6 +91,7 @@ export const createBooking = async (req, res) => {
     // Check if any required slot is already booked
     const existingBookings = await Booking.find({
       business_id,
+      employee_id,
       booking_date,
       booking_time: { $in: requiredSlots },
     });
@@ -88,6 +102,7 @@ export const createBooking = async (req, res) => {
     // Create booking (store only the start time in booking_time)
     const booking = await Booking.create({
       business_id,
+      employee_id,
       service_id, // still store the name
       customer_id,
       booking_date,
