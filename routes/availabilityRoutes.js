@@ -5,7 +5,8 @@ import {
   getAvailabilityByBusiness,
   getAvailabilityById,
   getAvailabilitySlots,
-  createWeeklyAvailability
+  createWeeklyAvailability,
+  createBatchAvailability
 } from "../controllers/availabilityController.js";
 import { protect } from "../middleware/authmiddleware.js";
 
@@ -23,7 +24,7 @@ router.get("/business/:businessId/slots", getAvailabilitySlots);
 router.get("/:id", getAvailabilityById);
 
 // routes/availabilityRoutes.js
-router.post("/batch", protect, createWeeklyAvailability);
+router.post("/batch", protect, createBatchAvailability);
 
 
 export default router;

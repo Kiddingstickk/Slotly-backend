@@ -180,3 +180,46 @@ export const createWeeklyAvailability = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
+export const createBatchAvailability = async (req, res) => {
+  try {
+    const { business_id, availability } = req.body;
+    // availability = [{ day_of_week, start_time, end_time, slot_duration }]
+
+    // Validate business
+    const business = await Business.findById(business_id);
+    if (!business) {
+      return res.status(400).json({ message: "Invalid business" });
+    }
+
+    // Fetch all employees for this business
+    const employees = await Employee.find({ business_id });
+    if (!employees.length) {
+      return res.status(400).json({ message: "No employees found for this business" });
+    }
+
+    // Build availability records for each employee
+    const records = [];
+    for (const emp of employees) {
+      for (const day of availability) {
+        records.push({
+          business_id,
+          employee_id: emp._id,
+          day_of_week: day.day_of_week,
+          start_time: day.start_time,
+          end_time: day.end_time,
+          slot_duration: day.slot_duration,
+        });
+      }
+    }
+
+    // Insert all in one go
+    const saved = await Availability.insertMany(records);
+
+    res.status(201).json({ message: "Availability created for all employees", data: saved });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
