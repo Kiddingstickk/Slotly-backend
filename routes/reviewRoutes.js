@@ -11,6 +11,6 @@ const router = express.Router();
 router.post("/batch", protect , createBatchReviews);
 
 // Get reviews for a business
-router.get("/business/:businessId", protect , getReviewsByBusiness);
+router.get("/business/:businessId",  getReviewsByBusiness);
 
 export default router;
