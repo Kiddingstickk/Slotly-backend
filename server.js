@@ -27,7 +27,7 @@ app.use(express.json());
 const allowedOrigins = [
   "https://slotlyy.netlify.app",
   "http://localhost:8080",
-  "https://slotlyy.vercel.app/"
+  "https://slotlyy.vercel.app"
 ];
 
 app.use(
