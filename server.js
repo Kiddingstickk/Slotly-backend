@@ -26,7 +26,8 @@ app.use(express.json());
 // Enable CORS
 const allowedOrigins = [
   "https://slotlyy.netlify.app",
-  "http://localhost:8080"
+  "http://localhost:8080",
+  "https://slotlyy.vercel.app/"
 ];
 
 app.use(

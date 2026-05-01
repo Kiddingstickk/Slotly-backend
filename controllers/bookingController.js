@@ -4,6 +4,7 @@ import Customer from "../models/Customer.js";
 import Availability from "../models/Availability.js";  
 import Employee from "../models/Employee.js";
 import { generateSlots } from "./availabilityController.js";
+import mongoose from "mongoose";
 
 
 export const createBooking = async (req, res) => {
@@ -282,6 +283,84 @@ export const cancelBooking = async (req, res) => {
     await booking.save();
 
     res.json({ message: "Booking cancelled", booking });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Filter bookings by date range
+export const getBookingsByDateRange = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const bookings = await Booking.find({
+      business_id: businessId,
+      booking_date: { $gte: new Date(startDate), $lte: new Date(endDate) },
+    }).populate("customer_id", "name phone");
+
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Booking analytics (total bookings, revenue, occupancy)
+export const getBookingAnalytics = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const { month } = req.query; // format: YYYY-MM
+
+    const start = new Date(`${month}-01`);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+
+    const analytics = await Booking.aggregate([
+      {
+        $match: {
+          business_id: new mongoose.Types.ObjectId(businessId),
+          booking_date: { $gte: start, $lt: end },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalBookings: { $sum: 1 },
+          totalRevenue: { $sum: "$price" }, // assuming price stored in booking
+        },
+      },
+    ]);
+
+    const result = analytics[0] || { totalBookings: 0, totalRevenue: 0 };
+
+    // Occupancy: booked slots vs total slots
+    const totalSlots = await Availability.countDocuments({ business_id: businessId });
+    const bookedSlots = result.totalBookings;
+    const occupancy = totalSlots > 0 ? (bookedSlots / totalSlots) * 100 : 0;
+
+    res.json({ ...result, occupancy });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

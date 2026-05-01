@@ -1,6 +1,7 @@
 // controllers/employeeController.js
 import Employee from "../models/Employee.js";
 import Business from "../models/Business.js";
+import Booking from "../models/Booking.js";
 
 // Create a new employee
 export const createEmployee = async (req, res) => {
@@ -57,6 +58,97 @@ export const getEmployeeById = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
     res.json(employee);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Update employee profile
+export const updateEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    Object.assign(employee, updates);
+    await employee.save();
+
+    res.json({ message: "Employee updated", employee });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Delete employee
+export const deleteEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    await employee.deleteOne();
+    res.json({ message: "Employee deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Analytics: bookings per employee (performance)
+export const getEmployeeAnalytics = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const { month } = req.query; // format: YYYY-MM
+
+    const start = new Date(`${month}-01`);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+
+    const analytics = await Booking.aggregate([
+      {
+        $match: {
+          business_id: new mongoose.Types.ObjectId(businessId),
+          booking_date: { $gte: start, $lt: end },
+        },
+      },
+      {
+        $group: {
+          _id: "$employee_id",
+          bookings: { $sum: 1 },
+        },
+      },
+      { $sort: { bookings: -1 } },
+    ]);
+
+    res.json(analytics);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

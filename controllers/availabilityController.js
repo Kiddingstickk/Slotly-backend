@@ -223,3 +223,63 @@ export const createBatchAvailability = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Update availability by ID
+export const updateAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const availability = await Availability.findById(id);
+    if (!availability) {
+      return res.status(404).json({ message: "Availability not found" });
+    }
+
+    Object.assign(availability, updates);
+    await availability.save();
+
+    res.json({ message: "Availability updated", availability });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Delete availability by ID
+export const deleteAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const availability = await Availability.findById(id);
+    if (!availability) {
+      return res.status(404).json({ message: "Availability not found" });
+    }
+
+    await availability.deleteOne();
+    res.json({ message: "Availability deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

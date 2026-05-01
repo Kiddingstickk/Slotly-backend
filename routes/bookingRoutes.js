@@ -6,7 +6,9 @@ import {
   updateBookingStatus,
   rescheduleBooking,
   updatePaymentStatus,
-  cancelBooking
+  cancelBooking,
+  getBookingsByDateRange,
+  getBookingAnalytics,
 } from "../controllers/bookingController.js";
 
 import { protect } from "../middleware/authmiddleware.js";
@@ -32,5 +34,10 @@ router.put("/:id/reschedule", protect, rescheduleBooking);
 router.put("/:id/payment", protect, updatePaymentStatus);
 
 router.put("/:id/cancel", protect, cancelBooking);
+
+
+
+router.get("/business/:businessId/date-range", getBookingsByDateRange);
+router.get("/business/:businessId/analytics", getBookingAnalytics);
 
 export default router;
