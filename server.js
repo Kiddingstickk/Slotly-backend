@@ -13,6 +13,7 @@ import testRoutes from "./routes/testRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 // Load env vars BEFORE importing cloudinary
 dotenv.config();
 
@@ -59,6 +60,7 @@ app.use("/api/test", testRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Connect Database
 connectDB();
