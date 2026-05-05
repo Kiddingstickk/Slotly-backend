@@ -12,7 +12,7 @@ export const createBooking = async (req, res) => {
     const {
       business_id,
       employee_id,
-      service_id, // actually service name
+      service_id, // can be string or array of names
       customer_id,
       booking_date,
       booking_time,
@@ -21,29 +21,43 @@ export const createBooking = async (req, res) => {
 
     // Validate business
     const business = await Business.findById(business_id);
-    if (!business) {
-      return res.status(400).json({ message: "Invalid business" });
-    }
+    if (!business) return res.status(400).json({ message: "Invalid business" });
 
     const employee = await Employee.findById(employee_id);
     if (!employee || employee.business_id.toString() !== business_id) {
       return res.status(400).json({ message: "Invalid employee for this business" });
     }
 
-    // Validate service by name
-    const service = business.services.find(s => s.name === service_id);
-    if (!service) {
-      return res.status(400).json({ message: "Invalid service" });
-    }
+    // Normalize service_id into an array
+    const serviceNames = Array.isArray(service_id) ? service_id : [service_id];
 
-    // Validate employee can perform this service
-    if (!employee.services.includes(service_id)) {
-      return res.status(400).json({ message: "Employee not authorized for this service" });
+    // Validate services and calculate total price + total duration
+    let totalPrice = 0;
+    let totalDuration = 0;
+    for (const serviceName of serviceNames) {
+      const svc = business.services.find(s => s.name === serviceName);
+      if (!svc) {
+        return res.status(400).json({ message: `Invalid service: ${serviceName}` });
+      }
+      if (!employee.services.includes(serviceName)) {
+        return res.status(400).json({ message: `Employee not authorized for service: ${serviceName}` });
+      }
+      totalPrice += svc.price;
+
+      // parse duration string into minutes
+      if (svc.duration) {
+        const lower = svc.duration.toLowerCase();
+        if (lower.includes("hour")) {
+          const hours = parseInt(lower);
+          totalDuration += hours * 60;
+        } else {
+          totalDuration += parseInt(lower);
+        }
+      }
     }
 
     const customer = await Customer.findById(customer_id);
     if (!customer) return res.status(400).json({ message: "Invalid customer" });
-
 
     // Get availability for that day
     const dayOfWeek = new Date(booking_date).toLocaleString("en-US", { weekday: "long" });
@@ -56,19 +70,7 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ message: "No availability for this day" });
     }
 
-    // Parse duration (strip "mins"/"hour" etc.)
-    let serviceDuration = 0;
-    if (service.duration) {
-      const lower = service.duration.toLowerCase();
-      if (lower.includes("hour")) {
-        const hours = parseInt(lower);
-        serviceDuration = hours * 60;
-      } else {
-        serviceDuration = parseInt(lower);
-      }
-    }
-
-    const slotsNeeded = Math.ceil(serviceDuration / availability.slot_duration);
+    const slotsNeeded = Math.ceil(totalDuration / availability.slot_duration);
 
     // Generate all slots for the day
     const slots = generateSlots(
@@ -100,15 +102,16 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ message: "One or more slots already booked" });
     }
 
-    // Create booking (store only the start time in booking_time)
+    // Create booking
     const booking = await Booking.create({
       business_id,
       employee_id,
-      service_id, // still store the name
+      service_id: serviceNames, // always stored as array
       customer_id,
       booking_date,
       booking_time,
       notes,
+      price: totalPrice, // store final price
     });
 
     res.status(201).json(booking);
@@ -116,6 +119,7 @@ export const createBooking = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // Get all bookings for a business
 export const getBookingsByBusiness = async (req, res) => {

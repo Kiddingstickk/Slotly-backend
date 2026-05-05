@@ -1,19 +1,15 @@
 import Booking from "../models/Booking.js";
 import Customer from "../models/Customer.js";
 import Review from "../models/Review.js";
-//import Service from "../models/Service.js";
 import mongoose from "mongoose";
 
-// Get revenue KPIs (daily, weekly, monthly, yearly)
+// Revenue summary (totals)
 export const getRevenueAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const { range = "month" } = req.query; // default monthly
-
-    const match = { business_id: new mongoose.Types.ObjectId(businessId) };
 
     const bookings = await Booking.aggregate([
-      { $match: match },
+      { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
       {
         $group: {
           _id: null,
@@ -29,37 +25,99 @@ export const getRevenueAnalytics = async (req, res) => {
   }
 };
 
-// Get occupancy (slots vs booked)
+// Revenue trend (daily breakdown)
+export const getRevenueTrend = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const trend = await Booking.aggregate([
+      { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
+      {
+        $group: {
+          _id: { day: { $dateToString: { format: "%Y-%m-%d", date: "$booking_date" } } },
+          value: { $sum: "$price" },
+        },
+      },
+      { $sort: { "_id.day": 1 } },
+    ]);
+
+    res.json(trend.map(t => ({ day: t._id.day, value: t.value })));
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Revenue by category (if services have category field)
+export const getRevenueByCategory = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const byCategory = await Booking.aggregate([
+      { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
+      { $unwind: "$service_id" },
+      {
+        $group: {
+          _id: "$service_id", // replace with category if stored
+          value: { $sum: "$price" },
+        },
+      },
+      { $sort: { value: -1 } },
+    ]);
+
+    res.json(byCategory);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Payment methods (requires payment_method field in Booking)
+export const getPaymentAnalytics = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const payments = await Booking.aggregate([
+      { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
+      {
+        $group: {
+          _id: "$payment_method",
+          value: { $sum: "$price" },
+        },
+      },
+    ]);
+
+    res.json(payments.map(p => ({ name: p._id, value: p.value })));
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Occupancy
 export const getOccupancyAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
     const { date } = req.query;
 
-    const totalSlots = await Booking.countDocuments({ business_id: businessId, booking_date: date });
-    // For simplicity, assume availability slots are precomputed
     const bookedSlots = await Booking.countDocuments({ business_id: businessId, booking_date: date });
+    const totalSlots = bookedSlots; // placeholder until availability slots are modeled
 
     const occupancy = totalSlots > 0 ? (bookedSlots / totalSlots) * 100 : 0;
-
     res.json({ occupancy });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get client analytics (new, returning, total)
+// Clients
 export const getClientAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
 
     const totalClients = await Customer.countDocuments({ business_id: businessId });
-
     const newClients = await Customer.countDocuments({
       business_id: businessId,
       createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 30)) },
     });
 
-    // Returning clients = those with >1 booking
     const returningClients = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
       { $group: { _id: "$customer_id", count: { $sum: 1 } } },
@@ -77,13 +135,12 @@ export const getClientAnalytics = async (req, res) => {
   }
 };
 
-// Get review analytics (average rating + distribution)
+// Reviews
 export const getReviewAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
 
     const reviews = await Review.find({ business_id: businessId });
-
     const total = reviews.length;
     const avg = total > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0;
 
@@ -98,15 +155,16 @@ export const getReviewAnalytics = async (req, res) => {
   }
 };
 
-// Get top services by bookings
+// Top services
 export const getTopServices = async (req, res) => {
   try {
     const { businessId } = req.params;
 
     const topServices = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
-      { $group: { _id: "$service_id", bookings: { $sum: 1 } } },
-      { $sort: { bookings: -1 } },
+      { $unwind: "$service_id" },
+      { $group: { _id: "$service_id", bookings: { $sum: 1 }, revenue: { $sum: "$price" } } },
+      { $sort: { revenue: -1 } },
       { $limit: 5 },
     ]);
 
@@ -116,32 +174,11 @@ export const getTopServices = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Employee analytics: bookings per employee
+// Employee analytics
 export const getEmployeeAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const { month } = req.query; // format: YYYY-MM
+    const { month } = req.query;
 
     const start = new Date(`${month}-01`);
     const end = new Date(start);
@@ -154,12 +191,7 @@ export const getEmployeeAnalytics = async (req, res) => {
           booking_date: { $gte: start, $lt: end },
         },
       },
-      {
-        $group: {
-          _id: "$employee_id",
-          bookings: { $sum: 1 },
-        },
-      },
+      { $group: { _id: "$employee_id", bookings: { $sum: 1 } } },
       { $sort: { bookings: -1 } },
     ]);
 
@@ -169,46 +201,36 @@ export const getEmployeeAnalytics = async (req, res) => {
   }
 };
 
-// Combined overview KPIs
+// Combined overview
 export const getOverviewAnalytics = async (req, res) => {
   try {
     const { businessId } = req.params;
 
-    // Revenue
     const revenueRes = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: "$price" },
-          totalBookings: { $sum: 1 },
-        },
-      },
+      { $group: { _id: null, totalRevenue: { $sum: "$price" }, totalBookings: { $sum: 1 } } },
     ]);
     const revenue = revenueRes[0] || { totalRevenue: 0, totalBookings: 0 };
 
-    // Occupancy
     const totalSlots = await Booking.countDocuments({ business_id: businessId });
     const bookedSlots = revenue.totalBookings;
     const occupancy = totalSlots > 0 ? (bookedSlots / totalSlots) * 100 : 0;
 
-    // Clients
     const totalClients = await Customer.countDocuments({ business_id: businessId });
     const newClients = await Customer.countDocuments({
       business_id: businessId,
       createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 30)) },
     });
 
-    // Reviews
     const reviews = await Review.find({ business_id: businessId });
     const avgRating = reviews.length > 0
       ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
       : 0;
 
-    // Top services
     const topServices = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
-      { $group: { _id: "$service_id", bookings: { $sum: 1 } } },
+      { $unwind: "$service_id" },
+      { $group: { _id: "$service_id", bookings: { $sum: 1 }, revenue: { $sum: "$price" } } },
       { $sort: { bookings: -1 } },
       { $limit: 5 },
     ]);

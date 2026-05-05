@@ -13,10 +13,10 @@ const bookingSchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
-    service_id: {
+    service_id:[ {
       type: String, 
       required: true,
-    },
+    }],
     customer_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
@@ -43,6 +43,10 @@ const bookingSchema = new mongoose.Schema(
     notes: {
       type: String, 
       trim: true,
+    },
+    price: {
+      type: Number,
+      required: true, // always store final total price
     },
   },
   { timestamps: true }
