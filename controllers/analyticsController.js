@@ -1,6 +1,7 @@
 import Booking from "../models/Booking.js";
 import Customer from "../models/Customer.js";
 import Review from "../models/Review.js";
+import Business from "../models/Business.js";
 import mongoose from "mongoose";
 
 // Revenue summary (totals)
@@ -47,28 +48,50 @@ export const getRevenueTrend = async (req, res) => {
   }
 };
 
-// Revenue by category (if services have category field)
+// Revenue by category (accurate: service price × count)
 export const getRevenueByCategory = async (req, res) => {
   try {
     const { businessId } = req.params;
 
     const byCategory = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
-      { $unwind: "$service_id" },
+      { $unwind: "$service_id" }, // assuming Booking stores service_id(s)
+      {
+        $lookup: {
+          from: "businesses", // join with Business collection
+          localField: "business_id",
+          foreignField: "_id",
+          as: "business"
+        }
+      },
+      { $unwind: "$business" },
+      { $unwind: "$business.services" },
+      {
+        $match: { $expr: { $eq: ["$service_id", "$business.services.name"] } }
+        // adjust if Booking stores ObjectId instead of name
+      },
       {
         $group: {
-          _id: "$service_id", // replace with category if stored
-          value: { $sum: "$price" },
-        },
+          _id: "$business.services.name",
+          bookings: { $sum: 1 },
+          revenue: { $sum: "$business.services.price" }
+        }
       },
-      { $sort: { value: -1 } },
+      { $sort: { revenue: -1 } }
     ]);
 
-    res.json(byCategory);
+    res.json(byCategory.map(c => ({
+      category: c._id,
+      bookings: c.bookings,
+      value: c.revenue
+    })));
   } catch (error) {
+    console.error("Error in getRevenueByCategory:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
 
 // Payment methods (requires payment_method field in Booking)
 export const getPaymentAnalytics = async (req, res) => {
@@ -155,7 +178,7 @@ export const getReviewAnalytics = async (req, res) => {
   }
 };
 
-// Top services
+// Top services (accurate: service price × count)
 export const getTopServices = async (req, res) => {
   try {
     const { businessId } = req.params;
@@ -163,16 +186,42 @@ export const getTopServices = async (req, res) => {
     const topServices = await Booking.aggregate([
       { $match: { business_id: new mongoose.Types.ObjectId(businessId) } },
       { $unwind: "$service_id" },
-      { $group: { _id: "$service_id", bookings: { $sum: 1 }, revenue: { $sum: "$price" } } },
+      {
+        $lookup: {
+          from: "businesses",
+          localField: "business_id",
+          foreignField: "_id",
+          as: "business"
+        }
+      },
+      { $unwind: "$business" },
+      { $unwind: "$business.services" },
+      {
+        $match: { $expr: { $eq: ["$service_id", "$business.services.name"] } }
+        // adjust if Booking stores ObjectId instead of name
+      },
+      {
+        $group: {
+          _id: "$business.services.name",
+          bookings: { $sum: 1 },
+          revenue: { $sum: "$business.services.price" }
+        }
+      },
       { $sort: { revenue: -1 } },
-      { $limit: 5 },
+      { $limit: 5 }
     ]);
 
-    res.json(topServices);
+    res.json(topServices.map(s => ({
+      service: s._id,
+      bookings: s.bookings,
+      revenue: s.revenue
+    })));
   } catch (error) {
+    console.error("Error in getTopServices:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // Employee analytics
 export const getEmployeeAnalytics = async (req, res) => {
